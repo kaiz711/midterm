@@ -1,165 +1,199 @@
-#include "Box.h"
-#include "Circle.h"
-#include "Geometric.h"
-#include "FunctionDraw.h"
-#include <vector>
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std;
 
-template<class T_CLASS> // Problem 1
-void print(const T_CLASS& i)
-{
-	cout << i << endl;
-}
+#define MAX2(a, b)							((a) > (b) ? (a) : (b))
+#define MAX3(a, b, c)						(MAX2(MAX2(a, b), (c)))
+#define MAX4(a, b, c, d)					(MAX2(MAX3(a, b, c), (d)))
 
-template<class T_A> // Problem 2
-class Vector2D
+class CellData
 {
 public:
-	T_A x, y;
+	double q_[4] = { 0.0, 0.0, 0.0, 0.0 };
+	double reward_ = 0.0;
 
-	void draw()
+	CellData()
 	{
-		cout << x << endl;
-		cout << y << endl;
+
+	}
+
+	double getMaxQ()
+	{
+		return MAX4(q_[0], q_[1], q_[2], q_[3]);
+	}
+};
+class GridWorld
+{
+public:
+	int i_res_, j_res_;
+	CellData *q_arr2d_ = nullptr;
+
+	GridWorld(const int& i_res, const int& j_res)
+		: i_res_(i_res), j_res_(j_res)
+	{
+		q_arr2d_ = new CellData[i_res * j_res];
+	}
+
+	CellData& getCell(const int& i, const int& j)
+	{
+		return q_arr2d_[i + i_res_ * j];
+	}
+
+	bool isInside(const int& i, const int& j)
+	{
+		if (i < 0) return false;
+		if (i >= i_res_) return false;
+
+		if (j < 0) return false;
+		if (j >= j_res_) return false;
+
+		return true;
+	}
+
+	void printSigned(const float& v)
+	{
+		if (v > 0.0f) printf("+%1.1f", v);
+		else if (v < 0.0f) printf("%1.1f", v);
+		else
+			printf("0.0");
+	}
+
+	void print()
+	{
+		for (int j = j_res_ - 1; j >= 0; j--)
+		{
+			for (int i = 0; i < i_res_; i++)
+			{
+				CellData &cell = getCell(i, j);
+				
+				printf("   "); printSigned(cell.q_[0]); printf("   ");
+				printf("   ");
+			}
+
+			printf("\n");
+
+			for (int i = 0; i < i_res_; i++)
+			{
+				CellData &cell = getCell(i, j);
+
+				printSigned(cell.q_[2]); printf("   "); printSigned(cell.q_[3]);
+				printf("   ");
+			}
+
+			printf("\n");
+
+			for (int i = 0; i < i_res_; i++)
+			{
+				CellData &cell = getCell(i, j);
+
+				printf("   "); printSigned(cell.q_[1]); printf("   ");
+				printf("   ");
+			}
+
+			printf("\n\n");
+		}
 	}
 };
 
-template<class T>
-class Geometric : public GeometricObject
+class Agent
 {
 public:
-	void draw()
+	int i_, j_;
+	double reward_;
+
+	Agent()
+		: i_(0), j_(0), reward_(0.0)
 	{
-		T drawShape;
-		drawShape.draw();
+
 	}
 };
 
 int main()
 {
-	vector<GeometricObject*> ob_list;
+	srand((unsigned int)time(NULL));
 
-	GeometricObject ob;
+	cout << "Hello, grid World!" << endl;
 
-	ob_list.push_back(new GeometricObject);
-	ob_list.push_back(new Box);
-	ob_list.push_back(new Circle);
-	ob_list.push_back(ob.getGeometricObject("Box"));
-	ob_list.push_back(ob.getGeometricObject("Circle"));
+	const int world_res_i = 3, world_res_j = 2;
 
-	for (auto itr : ob_list)
-		itr->draw();
+	GridWorld world(world_res_i, world_res_j);
 
-	for (auto itr : ob_list)
-		delete itr;
-
-	FunctionDraw my_function;
-
-	vector<FunctionDraw*> draw_list;
-
-	draw_list.push_back(my_function.decideShape("Square"));
-	draw_list.push_back(my_function.decideShape("Circle"));
-	draw_list.push_back(my_function.decideShape("circle"));
-
-	for (auto itr : draw_list)
+	for (int j = 0; j < world_res_j; j++)
 	{
-		itr->exec();
+		for (int i = 0; i < world_res_i; i++)
+		{
+			world.getCell(i, j).reward_ = -0.1;
+		}
 	}
 
-	for (auto itr : draw_list)
+	world.getCell(2, 1).reward_ = 1.0;
+	world.getCell(2, 0).reward_ = -1.0;
+
+	Agent my_agent;
+
+	world.print();
+
+	for (int t = 0; t < 10000; t++)
 	{
-		delete itr;
+		const int action = rand() % 4;
+
+		int i = my_agent.i_, j = my_agent.j_;
+		int i_old = i, j_old = j;
+
+		switch (action)
+		{
+		case 0:
+			j++;
+			break;
+		case 1:
+			j--;
+			break;
+		case 2:
+			i--;
+			break;
+		case 3:
+			i++;
+			break;
+		}
+
+		if (world.isInside(i, j) == true)
+		{
+			my_agent.i_ = i;
+			my_agent.j_ = j;
+			my_agent.reward_ += world.getCell(i, j).reward_;
+
+			world.getCell(i_old, j_old).q_[action] = world.getCell(i, j).reward_ + MAX4(world.getCell(i, j).q_[0], world.getCell(i, j).q_[1], world.getCell(i, j).q_[2], world.getCell(i, j).q_[3]);
+
+			if (i == 2)
+			{
+				world.getCell(i_old, j).q_[action] = world.getCell(i, j).reward_;
+				my_agent.i_ = 0;
+				my_agent.j_ = 0;
+			}
+
+			// move agent
+
+			// update reward (r_t)
+
+			// update q values of previous cell (q_t)
+
+			// reset if agent is in final cells
+		}
+
+		else
+		{
+			my_agent.i_ = i_old;
+			my_agent.j_ = j_old;
+			// you may give negative reward (penalty) to agent.
+		}
+
+		//cout << action << endl;
+		//cout << my_agent.i_ << " " << my_agent.j_ << endl;
 	}
 
-	print(1);
-	print(2.345f);
-	print("Hello World");
-
-	Vector2D<int> ex_vector;		// VectorInt2D
-	Vector2D<float> ex_vector2;		// VectorFloat2D
-	Vector2D<double> ex_vector3;	// VectorDouble2D
-
-	ex_vector.x = 1;
-	ex_vector.y = 2;
-	ex_vector.draw();
-
-	ex_vector2.x = 3.33f;
-	ex_vector2.y = 4.44f;
-	ex_vector2.draw();
-
-	ex_vector3.x = 5.5555;
-	ex_vector3.y = 6.6666;
-	ex_vector3.draw();
-
-	std::vector<GeometricObject*> obj_list;
-
-	obj_list.push_back(new Geometric<Box>);
-	obj_list.push_back(new Geometric<Circle>);
-	obj_list.push_back(new Geometric<GeometricObject>);
-	obj_list.push_back(new Geometric<GeometricObject>);
-	obj_list.push_back(new Geometric<GeometricObject>);
-	obj_list.push_back(new Geometric<GeometricObject>);
-	obj_list.push_back(new Geometric<GeometricObject>);
-
-	for (auto itr : obj_list)
-		itr->draw();
-
-	for (auto itr : obj_list)
-		delete itr;
-
-	GeometricObject *my_geo = new GeometricObject;
-	my_geo->draw();
-
-	GeometricObject *my_box = new Box;
-	my_box->draw();
-
-	GeometricObject **geo_list = new GeometricObject*[10];
-
-	for (int i = 0; i < 10; i++)
-	{
-		geo_list[i] = new Box;
-		geo_list[i]->draw();
-		geo_list[i] = new Circle;
-		geo_list[i]->draw();
-	}
-
-	delete[] geo_list;
+	world.print();
 
 	return 0;
 }
-
-//struct Vector2D
-//{
-//	int x;
-//	int y;
-//
-//	void print()
-//	{
-//		printf("%d %d", x, y);
-//	}
-//};
-//
-//std::ostream &operator << (std::ostream &stream, Vector2D obj)
-//{
-//	stream << obj.x << " " << obj.y;
-//
-//	return stream;
-//}
-//
-//void main()
-//{
-//	Vector2D my_vector;
-//
-//	my_vector.x = 1;
-//	my_vector.y = 2;
-//
-//	my_vector.print();
-//
-//	using namespace std;
-//
-//	std::cout << my_vector << std::endl;
-//
-//	ofstream ofile("cppstyle.txt");
-//	ofile << my_vector << endl;
-//}
